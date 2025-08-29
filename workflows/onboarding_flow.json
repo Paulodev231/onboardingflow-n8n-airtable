@@ -1,0 +1,62 @@
+{
+    "name": "OnboardingFlow - Webhook -> OpenAI -> Airtable -> Email",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "onboarding-webhook"
+        },
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [250, 250]
+      },
+      {
+        "parameters": {
+          "requestMethod": "POST",
+          "url": "https://api.openai.com/v1/chat/completions",
+          "options": {},
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer {{$env.OPENAI_API_KEY}}"
+          },
+          "bodyParametersJson": "={\"model\":\"gpt-3.5-turbo\",\"messages\":[{\"role\":\"system\",\"content\":\"You are a helpful onboarding content generator. Create a 3-step personalized onboarding sequence with short tasks and tips for a new user.\"},{\"role\":\"user\",\"content\":\"Generate a welcome sequence for the user: Name: {{$json[\"name\"]}}, Product: {{$json[\"product\"]}}, Role: {{$json[\"role\"]}}. Keep it friendly, actionable, and 3 steps.\"}],\"max_tokens\":450}"
+        },
+        "name": "OpenAI Request",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 1,
+        "position": [520, 250]
+      },
+      {
+        "parameters": {
+          "operation": "create",
+          "application": "={{$env.AIRTABLE_APP_ID}}",
+          "table": "Onboarding",
+          "fields": "=({\"Name\": $json[\"name\"], \"Email\": $json[\"email\"], \"Product\": $json[\"product\"], \"Role\": $json[\"role\"], \"WelcomeSequence\": $json[\"choices\"][0][\"message\"][\"content\"], \"Status\": \"Not Started\"})"
+        },
+        "name": "Airtable Create",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 1,
+        "position": [820, 220]
+      },
+      {
+        "parameters": {
+          "fromEmail": "no-reply@example.com",
+          "toEmail": "={{$json[\"email\"]}}",
+          "subject": "Welcome to {{$json[\"product\"]}} — Getting Started",
+          "text": "Hi {{$json[\"name\"]}},\n\nWelcome! Here is your personalized 3-step onboarding plan:\n\n{{$json[\"choices\"][0][\"message\"][\"content\"]}}\n\nIf you have questions, reply to this email.\n\nBest,\nThe Team"
+        },
+        "name": "Send Email",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 1,
+        "position": [1120, 250]
+      }
+    ],
+    "connections": {
+      "Webhook": { "main": [[ { "node": "OpenAI Request", "type": "main", "index": 0 } ]] },
+      "OpenAI Request": { "main": [[ { "node": "Airtable Create", "type": "main", "index": 0 }, { "node": "Send Email", "type": "main", "index": 0 } ]] }
+    },
+    "active": false,
+    "settings": {}
+  }
+  
